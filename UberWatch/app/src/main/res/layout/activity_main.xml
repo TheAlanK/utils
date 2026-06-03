@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="20dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="UberWatch"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:paddingBottom="16dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Preço alvo (R$) — notifica se cair abaixo disso:"
+            android:paddingTop="8dp" />
+
+        <EditText
+            android:id="@+id/inputTarget"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal"
+            android:hint="ex: 25.00" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Queda do pico (%) — notifica se cair essa % do maior preço visto:"
+            android:paddingTop="16dp" />
+
+        <EditText
+            android:id="@+id/inputDropPct"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal"
+            android:hint="ex: 15" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Categorias para monitorar (separadas por vírgula). Vazio = menor preço da tela. Considera o preço COM desconto:"
+            android:paddingTop="16dp" />
+
+        <EditText
+            android:id="@+id/inputCategories"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="text"
+            android:hint="ex: UberX, Comfort, Prioridade" />
+
+        <Button
+            android:id="@+id/btnSave"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Salvar config"
+            android:layout_marginTop="20dp" />
+
+        <Button
+            android:id="@+id/btnAccessibility"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Abrir Configurações de Acessibilidade"
+            android:layout_marginTop="8dp" />
+
+        <Button
+            android:id="@+id/btnStartMonitor"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Abrir Uber e iniciar monitoramento"
+            android:layout_marginTop="8dp" />
+
+        <Button
+            android:id="@+id/btnStopMonitor"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Parar monitoramento"
+            android:layout_marginTop="8dp" />
+
+        <Button
+            android:id="@+id/btnReset"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Resetar histórico (pico/alerta)"
+            android:layout_marginTop="8dp" />
+
+        <TextView
+            android:id="@+id/status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Status: —"
+            android:textSize="15sp"
+            android:paddingTop="24dp"
+            android:fontFamily="monospace" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Diagnóstico (atualiza sozinho):"
+            android:textStyle="bold"
+            android:paddingTop="24dp" />
+
+        <TextView
+            android:id="@+id/diag"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Diagnóstico: —"
+            android:textSize="12sp"
+            android:paddingTop="8dp"
+            android:fontFamily="monospace"
+            android:background="#11000000"
+            android:padding="8dp" />
+
+        <Button
+            android:id="@+id/btnClearLog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Limpar log"
+            android:layout_marginTop="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:paddingTop="24dp"
+            android:text="Como usar:\n1. Defina alvo e/ou queda do pico, e as categorias.\n2. Salve a config.\n3. Ative a Acessibilidade do UberWatch.\n4. Toque em 'Abrir Uber e iniciar monitoramento' e vá até a tela de estimativa de preço.\n5. Deixe a Uber visível. O app relê a tela a cada 2s e te avisa quando o preço (com desconto) cair conforme sua regra.\n\nObs: só lê enquanto a Uber estiver em foreground.\n\nDiagnóstico: o contador 'Leituras (ticks)' deve subir a cada ~2s — se não sobe, o serviço não está rodando. No Logcat filtre pela tag 'UberWatch'." />
+
+    </LinearLayout>
+</ScrollView>

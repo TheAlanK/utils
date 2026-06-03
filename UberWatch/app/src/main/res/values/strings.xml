@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">UberWatch</string>
+    <string name="accessibility_desc">Lê o preço exibido na tela do app da Uber para monitorar quedas de tarifa dinâmica.</string>
+</resources>
