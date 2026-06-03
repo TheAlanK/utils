@@ -146,14 +146,16 @@ class MainActivity : AppCompatActivity() {
     private fun refreshDiag() {
         val age = if (Diag.lastScanAt == 0L) "—"
         else "${(System.currentTimeMillis() - Diag.lastScanAt) / 1000}s atrás"
+        val accOn = isAccessibilityEnabled()
+        val monitoring = Config.monitoring(this)
 
         b.diag.text = buildString {
             append("Serviço: ")
             append(if (Diag.serviceConnected) "conectado" else "NÃO conectado")
             append("\nAcessibilidade: ")
-            append(if (isAccessibilityEnabled()) "ativa" else "DESATIVADA")
+            append(if (accOn) "ativa" else "DESATIVADA")
             append("\nMonitorando: ")
-            append(if (Config.monitoring(this)) "sim" else "não")
+            append(if (monitoring) "sim" else "não")
             append("\nLeituras (ticks): ${Diag.scanCount}")
             append("\nÚltima leitura: $age")
             append("\n\nLog (mais recente no topo):\n")
