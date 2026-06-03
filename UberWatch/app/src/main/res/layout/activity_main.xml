@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="20dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="UberWatch"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:paddingBottom="16dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Preço alvo (R$) — notifica se cair abaixo disso:"
+            android:paddingTop="8dp" />
+
+        <EditText
+            android:id="@+id/inputTarget"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal"
+            android:hint="ex: 25.00" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Queda do pico (%) — notifica se cair essa % do maior preço visto:"
+            android:paddingTop="16dp" />
+
+        <EditText
+            android:id="@+id/inputDropPct"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal"
+            android:hint="ex: 15" />
+
+        <Button
+            android:id="@+id/btnSave"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Salvar config"
+            android:layout_marginTop="20dp" />
+
+        <Button
+            android:id="@+id/btnAccessibility"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Abrir Configurações de Acessibilidade"
+            android:layout_marginTop="8dp" />
+
+        <Button
+            android:id="@+id/btnOpenUber"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Abrir Uber (foreground)"
+            android:layout_marginTop="8dp" />
+
+        <Button
+            android:id="@+id/btnReset"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Resetar histórico (pico/alerta)"
+            android:layout_marginTop="8dp" />
+
+        <TextView
+            android:id="@+id/status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Status: —"
+            android:textSize="15sp"
+            android:paddingTop="24dp"
+            android:fontFamily="monospace" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:paddingTop="24dp"
+            android:text="Como usar:\n1. Salve sua config\n2. Ative a acessibilidade do UberWatch\n3. Abra a Uber na tela de estimativa de preço e deixe visível\n4. Quando o preço cair, você recebe notificação.\n\nObs: o app só lê enquanto a tela da Uber estiver em foreground. Surge não muda em segundos, então deixe a Uber aberta na tela do preço." />
+
+    </LinearLayout>
+</ScrollView>
