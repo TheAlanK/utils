@@ -2,6 +2,8 @@ package com.personal.uberwatch
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -10,6 +12,15 @@ import com.personal.uberwatch.databinding.ActivityMainBinding
 class MainActivity : AppCompatActivity() {
 
     private lateinit var b: ActivityMainBinding
+
+    // Atualiza o painel de diagnóstico enquanto a tela está visível.
+    private val ui = Handler(Looper.getMainLooper())
+    private val diagTick = object : Runnable {
+        override fun run() {
+            refreshDiag()
+            ui.postDelayed(this, 1000)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,6 +66,7 @@ class MainActivity : AppCompatActivity() {
             }
             Config.setMonitoring(this, true)
             Config.reset(this)
+            Diag.log("Monitoramento LIGADO pelo usuário")
             Toast.makeText(
                 this,
                 "Monitorando. Abra a tela de estimativa de preço da Uber.",
@@ -66,6 +78,7 @@ class MainActivity : AppCompatActivity() {
 
         b.btnStopMonitor.setOnClickListener {
             Config.setMonitoring(this, false)
+            Diag.log("Monitoramento DESLIGADO pelo usuário")
             Toast.makeText(this, "Monitoramento parado.", Toast.LENGTH_SHORT).show()
             refreshStatus()
         }
@@ -76,12 +89,24 @@ class MainActivity : AppCompatActivity() {
             refreshStatus()
         }
 
+        b.btnClearLog.setOnClickListener {
+            Diag.clear()
+            refreshDiag()
+        }
+
         refreshStatus()
     }
 
     override fun onResume() {
         super.onResume()
         refreshStatus()
+        ui.removeCallbacks(diagTick)
+        ui.post(diagTick)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        ui.removeCallbacks(diagTick)
     }
 
     // Confere se o serviço de acessibilidade do app está ativo nas configurações.
@@ -114,6 +139,25 @@ class MainActivity : AppCompatActivity() {
                 append("\n\nÚltima leitura:\n")
                 append(last)
             }
+        }
+    }
+
+    // Painel de diagnóstico: prova que o polling está vivo e mostra o log recente.
+    private fun refreshDiag() {
+        val age = if (Diag.lastScanAt == 0L) "—"
+        else "${(System.currentTimeMillis() - Diag.lastScanAt) / 1000}s atrás"
+
+        b.diag.text = buildString {
+            append("Serviço: ")
+            append(if (Diag.serviceConnected) "conectado" else "NÃO conectado")
+            append("\nAcessibilidade: ")
+            append(if (isAccessibilityEnabled()) "ativa" else "DESATIVADA")
+            append("\nMonitorando: ")
+            append(if (Config.monitoring(this)) "sim" else "não")
+            append("\nLeituras (ticks): ${Diag.scanCount}")
+            append("\nÚltima leitura: $age")
+            append("\n\nLog (mais recente no topo):\n")
+            append(Diag.recent(40))
         }
     }
 }

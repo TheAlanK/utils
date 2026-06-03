@@ -75,6 +75,23 @@ O APK debug já vem assinado automaticamente, então instala direto. Não precis
 - **Quebra com mudança de UI:** se a Uber redesenhar a tela, o parsing pode parar. É esperado.
 - **Só lê em foreground:** se você sair da tela da Uber, ele para de ler até voltar.
 
+## Diagnóstico (saber se está funcionando)
+A tela principal tem um painel **Diagnóstico** que atualiza sozinho a cada 1s:
+- **Serviço:** se o serviço de acessibilidade está conectado.
+- **Leituras (ticks):** contador que sobe a cada ~2s. Se **não sobe**, o serviço não está
+  rodando (acessibilidade desligada ou serviço morto pelo sistema).
+- **Última leitura:** há quantos segundos foi o último ciclo.
+- **Log:** as últimas linhas do que o app está fazendo (qual app está em foreground, quantos
+  preços achou, qual categoria casou, alertas disparados).
+
+Tudo isso também sai no **Logcat** com a tag `UberWatch` (útil via `adb logcat -s UberWatch`).
+
+### "Os preços não atualizam"
+O Android mantém um **cache da árvore de acessibilidade**: ao reler a tela sem um evento de
+mudança, ele devolve o texto antigo — por isso parecia que só atualizava ao trocar o foco. O
+app agora força `refresh()` nos nós com texto (em uma thread de background, porque `refresh()`
+faz IPC). Se ainda assim travar, olhe no log se o `tick:` mostra o mesmo preço sempre.
+
 ## Ajustes que você provavelmente vai querer
 Em `PriceAccessibilityService.kt`:
 - `POLL_INTERVAL_MS` — frequência de releitura da tela (default 2s).

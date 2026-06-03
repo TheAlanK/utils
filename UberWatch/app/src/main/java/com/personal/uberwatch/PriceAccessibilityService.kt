@@ -8,7 +8,7 @@ import android.content.Intent
 import android.graphics.Rect
 import android.os.Build
 import android.os.Handler
-import android.os.Looper
+import android.os.HandlerThread
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.core.app.NotificationCompat
@@ -25,7 +25,9 @@ class PriceAccessibilityService : AccessibilityService() {
         // de acessibilidade quando o preço fica parado na tela).
         private const val POLL_INTERVAL_MS = 2000L
         // Throttle para não reprocessar a árvore a cada evento (são muitos).
-        private const val EVENT_THROTTLE_MS = 800L
+        private const val EVENT_THROTTLE_MS = 700L
+        // Evita floodar o log quando o app em foreground não é a Uber.
+        private const val FOREIGN_LOG_THROTTLE_MS = 5000L
         // Preços plausíveis de corrida (filtra "R$ 5,00 de desconto" etc grosseiramente)
         private const val MIN_PLAUSIBLE = 5.0f
         private const val MAX_PLAUSIBLE = 2000.0f
@@ -35,14 +37,17 @@ class PriceAccessibilityService : AccessibilityService() {
     private val pricePattern: Pattern =
         Pattern.compile("R?\\$?\\s*([0-9]{1,4})[.,]([0-9]{2})")
 
-    private val handler = Handler(Looper.getMainLooper())
+    // Leitura roda em background: refresh() faz IPC e não pode travar a main thread.
+    private var worker: HandlerThread? = null
+    private var bg: Handler? = null
     private val poller = object : Runnable {
         override fun run() {
             scan()
-            handler.postDelayed(this, POLL_INTERVAL_MS)
+            bg?.postDelayed(this, POLL_INTERVAL_MS)
         }
     }
-    private var lastScan = 0L
+    private var lastEvent = 0L
+    private var lastForeignLog = 0L
 
     // Um texto lido na tela com a posição vertical do seu nó (para agrupar por linha).
     private data class Item(val text: String, val cy: Int, val height: Int)
@@ -50,39 +55,61 @@ class PriceAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         createChannel()
-        // Loop de leitura ativo: roda enquanto o serviço estiver conectado.
-        handler.removeCallbacks(poller)
-        handler.post(poller)
+        Diag.serviceConnected = true
+        Diag.log("Serviço de acessibilidade conectado")
+        val t = HandlerThread("uberwatch-scan").apply { start() }
+        worker = t
+        bg = Handler(t.looper).also {
+            it.removeCallbacks(poller)
+            it.post(poller)
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         // Também relê em eventos, para resposta mais rápida quando a tela muda.
-        if (System.currentTimeMillis() - lastScan < EVENT_THROTTLE_MS) return
-        scan()
+        val now = System.currentTimeMillis()
+        if (now - lastEvent < EVENT_THROTTLE_MS) return
+        lastEvent = now
+        val type = event?.let { AccessibilityEvent.eventTypeToString(it.eventType) } ?: "?"
+        Diag.log("evento: $type pkg=${event?.packageName}")
+        bg?.post { scan() }
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
-        handler.removeCallbacks(poller)
+        Diag.serviceConnected = false
+        Diag.log("Serviço desconectado")
+        bg?.removeCallbacksAndMessages(null)
+        worker?.quitSafely()
+        worker = null
+        bg = null
         return super.onUnbind(intent)
     }
 
     override fun onInterrupt() {}
 
     private fun scan() {
-        lastScan = System.currentTimeMillis()
+        Diag.markScan()
         if (!Config.monitoring(this)) return
 
-        val root = rootInActiveWindow ?: return
-        // Só processa se a janela ativa for da Uber
-        if (root.packageName?.toString() != UBER_PKG) {
+        val root = rootInActiveWindow
+        if (root == null) {
+            Diag.log("tick: sem janela ativa (rootInActiveWindow=null)")
+            return
+        }
+        val pkg = root.packageName?.toString()
+        if (pkg != UBER_PKG) {
             root.recycle()
+            val now = System.currentTimeMillis()
+            if (now - lastForeignLog > FOREIGN_LOG_THROTTLE_MS) {
+                lastForeignLog = now
+                Diag.log("tick: app em foreground não é a Uber (pkg=$pkg)")
+            }
             return
         }
 
         val items = mutableListOf<Item>()
         collect(root, items)
         root.recycle()
-        if (items.isEmpty()) return
 
         // Todos os preços plausíveis da tela, com a posição vertical onde aparecem.
         val priceItems = mutableListOf<Pair<Float, Int>>() // valor, cy
@@ -93,7 +120,10 @@ class PriceAccessibilityService : AccessibilityService() {
                 if (v in MIN_PLAUSIBLE..MAX_PLAUSIBLE) priceItems.add(v to it.cy)
             }
         }
-        if (priceItems.isEmpty()) return
+        if (priceItems.isEmpty()) {
+            Diag.log("tick: nenhum preço plausível na tela (textos lidos=${items.size})")
+            return
+        }
 
         val wanted = Config.categories(this)
         // Mantém ordem de inserção para o status ficar estável.
@@ -109,39 +139,62 @@ class PriceAccessibilityService : AccessibilityService() {
                 // Rótulo da categoria: texto sem dígitos que casa com o nome pedido.
                 val label = items.firstOrNull { item ->
                     val n = normalize(item.text)
-                    n.isNotEmpty() && item.text.none { it.isDigit() } &&
+                    n.isNotEmpty() && item.text.none { c -> c.isDigit() } &&
                         (n.contains(catNorm) || catNorm.startsWith(n) || n.startsWith(catNorm))
-                } ?: continue
+                }
+                if (label == null) {
+                    Diag.log("  '$cat': rótulo não encontrado na tela")
+                    continue
+                }
                 // Preços na MESMA linha do rótulo (mesmo eixo vertical).
                 val tol = maxOf(label.height, 1)
                 val rowPrices = priceItems.filter { abs(it.second - label.cy) <= tol }
                 // Preço com DESCONTO = o menor da linha (o cheio fica riscado e é maior).
-                val effective = rowPrices.minByOrNull { it.first }?.first ?: continue
+                val effective = rowPrices.minByOrNull { it.first }?.first
+                if (effective == null) {
+                    Diag.log("  '$cat': rótulo achado mas sem preço na mesma linha")
+                    continue
+                }
                 results[cat] = effective
             }
         }
 
-        if (results.isEmpty()) return
+        if (results.isEmpty()) {
+            Diag.log("tick: preços=${priceItems.size} na tela, mas nenhuma categoria casou")
+            return
+        }
 
-        // Atualiza resumo para a UI.
+        // Atualiza resumo para a UI + log.
+        val summary = results.entries.joinToString(", ") { "${it.key}=${"%.2f".format(it.value)}" }
         Config.setLastStatus(
             this,
             results.entries.joinToString("\n") { "${it.key}: R$ ${"%.2f".format(it.value)}" }
         )
+        Diag.log("tick: $summary")
 
         for ((cat, price) in results) evaluate(cat, price)
     }
 
     private fun collect(node: AccessibilityNodeInfo?, out: MutableList<Item>) {
         if (node == null) return
+        // Busca conteúdo fresco do app: o cache de acessibilidade pode estar velho, o
+        // que fazia o preço só "atualizar" quando a janela mudava de foco. Só vale a pena
+        // em nós que têm texto (evita IPC desnecessário nos containers).
+        val hasContent = node.text != null || node.contentDescription != null
+        if (hasContent) {
+            try { node.refresh() } catch (_: Exception) {}
+        }
         val r = Rect()
         node.getBoundsInScreen(r)
         val cy = (r.top + r.bottom) / 2
         val h = r.height()
         node.text?.toString()?.let { if (it.isNotBlank()) out.add(Item(it, cy, h)) }
         node.contentDescription?.toString()?.let { if (it.isNotBlank()) out.add(Item(it, cy, h)) }
-        for (i in 0 until node.childCount) {
-            collect(node.getChild(i), out)
+        val count = node.childCount
+        for (i in 0 until count) {
+            val child = node.getChild(i) ?: continue
+            collect(child, out)
+            try { child.recycle() } catch (_: Exception) {}
         }
     }
 
@@ -177,6 +230,7 @@ class PriceAccessibilityService : AccessibilityService() {
         // Só alerta se for um preço novo/menor que o último alertado (evita spam).
         if (triggered && (lastAlert == 0f || price < lastAlert)) {
             Config.setLastAlert(this, cat, price)
+            Diag.log("ALERTA $cat R$ ${"%.2f".format(price)} — $reason")
             notifyDrop(cat, price, reason)
         }
     }
