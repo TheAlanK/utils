@@ -5,6 +5,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
+    <!-- Android 11+ (API 30+) restringe a visibilidade de outros apps. Sem este
+         bloco, getLaunchIntentForPackage("com.ubercab") retorna null mesmo com a
+         Uber instalada, e o app diz "App da Uber não encontrado". -->
+    <queries>
+        <package android:name="com.ubercab" />
+    </queries>
+
     <application
         android:allowBackup="true"
         android:icon="@android:drawable/ic_dialog_info"
