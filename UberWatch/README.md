@@ -37,30 +37,47 @@ O APK debug já vem assinado automaticamente, então instala direto. Não precis
 1. Instale o APK no celular.
 2. Abra o UberWatch:
    - Defina **Preço alvo** (ex: 25.00) e/ou **Queda do pico %** (ex: 15).
+   - Em **Categorias para monitorar**, liste as opções que te interessam, separadas por
+     vírgula (ex: `UberX, Comfort, Prioridade`). Pode ser uma ou várias. Se deixar **vazio**,
+     ele monitora o **menor preço** que aparecer na tela.
    - Toque em **Salvar config**.
 3. Toque em **Abrir Configurações de Acessibilidade** e ative o **UberWatch** na lista.
    (Vai pedir confirmação de que o app pode ler o conteúdo da tela — é necessário.)
-4. Abra o app da Uber, vá até a tela de estimativa de preço da corrida, e **deixe a tela aberta**.
-5. Mantenha o celular ligado nessa tela. Quando o preço cair conforme sua regra, chega a notificação.
+4. Toque em **Abrir Uber e iniciar monitoramento**. Isso liga o monitoramento e já abre a
+   Uber. Vá até a tela de estimativa de preço da corrida e **deixe a tela aberta**.
+5. Mantenha o celular nessa tela. O app relê a tela **a cada 2s** (não depende mais de você
+   trocar de foco) e, quando o preço cair conforme sua regra, chega a notificação por categoria.
+6. Quando terminar, toque em **Parar monitoramento** para o app parar de reler a tela.
 
-## Regras de disparo
+## Qual preço ele lê (várias categorias / desconto)
+- A tela da Uber mostra várias categorias (UberX, Comfort, Prioridade, ...), cada uma com seu
+  preço. O app **casa cada preço com a categoria pela linha** em que aparecem (mesma posição
+  vertical na tela).
+- Quando há promoção, a linha mostra **dois preços**: o com desconto e o **cheio riscado**
+  (maior). O app considera o **menor da linha** = o preço **com desconto**, que é o que você paga.
+- O nome da categoria casa mesmo truncado (ex: `Priorida...` casa com `Prioridade`) e ignora
+  acentos/maiúsculas.
+
+## Regras de disparo (por categoria)
 - **Alvo fixo:** preço atual <= alvo.
-- **Queda do pico:** preço atual <= pico * (1 - pct/100). O "pico" é o maior preço visto desde o último reset.
+- **Queda do pico:** preço atual <= pico * (1 - pct/100). O "pico" é o maior preço visto
+  daquela categoria desde o último reset.
+- Cada categoria tem seu próprio pico/alerta e gera notificação separada.
 - Notifica só quando o preço é novo/menor que o último já alertado (evita spam).
-- Use **Resetar histórico** quando começar a vigiar uma nova corrida.
+- Use **Resetar histórico** ao começar a vigiar uma nova corrida.
 
 ## Limitações conhecidas (app pessoal, interface lixona mesmo)
-- **Heurística de preço:** o app pega o MAIOR valor plausível em `R$` na tela como sendo o
-  preço da corrida. Se a Uber mostrar outro valor maior (ex: total de viagem antiga, gorjeta),
-  pode pegar errado. Ajuste `MIN_PLAUSIBLE`/`MAX_PLAUSIBLE` ou a heurística em
-  `PriceAccessibilityService.kt` se notar leitura errada.
+- **Heurística de preço:** dentro da linha da categoria ele pega o **menor** valor em `R$`
+  (assume que o maior é o preço cheio riscado). Se a Uber mostrar a linha de outro jeito, pode
+  errar. Ajuste `MIN_PLAUSIBLE`/`MAX_PLAUSIBLE` ou a lógica em `PriceAccessibilityService.kt`.
+- **Casamento por linha:** depende dos preços ficarem na mesma altura do nome da categoria.
+  Se a Uber empilhar diferente, pode pegar a linha errada — ajuste a tolerância (`tol`).
 - **Quebra com mudança de UI:** se a Uber redesenhar a tela, o parsing pode parar. É esperado.
 - **Só lê em foreground:** se você sair da tela da Uber, ele para de ler até voltar.
-- **Múltiplas categorias (UberX, Comfort, etc):** ele lê todos os preços e pega o maior. Se
-  quiser monitorar uma categoria específica, vai precisar refinar `collectPrices` para casar
-  o preço com o texto da categoria.
 
 ## Ajustes que você provavelmente vai querer
 Em `PriceAccessibilityService.kt`:
-- `MIN_INTERVAL_MS` — frequência de leitura (default 1.5s).
-- A linha `prices...maxOrNull()` — troque a heurística se o preço certo não for o maior.
+- `POLL_INTERVAL_MS` — frequência de releitura da tela (default 2s).
+- A linha `rowPrices.minByOrNull { ... }` — troque a heurística se o preço certo não for o
+  menor da linha.
+- `tol` (tolerância vertical) — aumente se o preço e o nome da categoria não estiverem casando.
